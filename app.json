@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "宝宝工作台",
+    "slug": "baby-worktable",
+    "version": "0.1.0",
+    "scheme": "babyworktable",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "web": {
+      "baseUrl": "/baby-worktable"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.babyworktable.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "仅用于为宝宝的异常事件记录附加照片，照片不会离开设备。"
+      }
+    },
+    "android": {
+      "package": "com.babyworktable.app",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "允许访问相册以附加宝宝健康照片。照片仅保存在本机。"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#F97316"
+        }
+      ],
+      "expo-sqlite"
+    ]
+  }
+}

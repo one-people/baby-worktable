@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native folders produced by prebuild（如后续使用 dev client）
+ios/
+android/
+
+# Logs & misc
+*.log
+.DS_Store
+*.tsbuildinfo
+
+# Local backups exported by the app itself
+backups/

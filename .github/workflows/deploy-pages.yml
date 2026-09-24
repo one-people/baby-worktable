@@ -1,0 +1,55 @@
+# 推送到 main 即自动构建并发布 web 版到 GitHub Pages
+# 前提：仓库 Settings → Pages → Build and deployment → Source 选择 "GitHub Actions"
+# 注意：仓库名若不是 baby-worktable，需同步修改 app.json 的 web.baseUrl
+# 和 package.json 的 export:web 脚本里的子路径，以及下方 REPO_BASE
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  # GitHub Pages 站点子路径（= 仓库名），需与 app.json web.baseUrl 保持一致
+  REPO_BASE: /baby-worktable
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Export static web build
+        run: |
+          npx expo export --platform web
+          node scripts/fix-pages-paths.mjs dist "$REPO_BASE"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
