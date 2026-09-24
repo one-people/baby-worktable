@@ -109,8 +109,8 @@ export interface IGrowthService {
 }
 
 export interface IBackupService {
-  /** 导出全部业务数据：web 优先系统保存对话框、否则浏览器下载；原生写沙盒并尝试分享 */
-  exportAll(): Promise<{ rowCount: number; fileName: string; filePath: string; via?: 'picker' | 'download' | 'cancel' }>;
+  /** 导出全部业务数据：web 优先保存对话框（iOS 为系统分享面板），否则浏览器下载；原生写沙盒并尝试分享 */
+  exportAll(): Promise<{ rowCount: number; fileName: string; filePath: string; via?: 'picker' | 'share' | 'download' | 'cancel' }>;
   /** 校验并全量导入备份 JSON（覆盖现有数据），返回恢复的行数 */
   importAll(json: string): Promise<number>;
 }

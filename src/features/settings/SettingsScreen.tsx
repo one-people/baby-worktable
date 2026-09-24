@@ -32,9 +32,14 @@ export function SettingsScreen({ navigation }: Props) {
   const exportData = async () => {
     try {
       const result = await backup.exportAll();
-      if (result.via === 'cancel') return; // 用户在系统保存对话框点了取消
+      if (result.via === 'cancel') return; // 用户在系统对话框/分享面板点了取消
       if (result.via === 'picker') {
         Alert.alert('导出成功', `已保存备份文件（共 ${result.rowCount} 条记录）：\n${result.fileName}`);
+      } else if (result.via === 'share') {
+        Alert.alert(
+          '导出成功',
+          `备份文件已进入分享面板（共 ${result.rowCount} 条记录）。\n选择「存储到文件」即可保存，也可以直接通过微信 / AirDrop 发送。`,
+        );
       } else if (Platform.OS === 'web') {
         Alert.alert(
           '导出成功',

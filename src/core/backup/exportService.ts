@@ -115,8 +115,11 @@ export interface ExportResult {
   fileName: string;
   /** 原生端沙盒文件路径；web 端为空串 */
   filePath: string;
-  /** web 端导出方式：picker=系统保存对话框、download=浏览器下载、cancel=用户取消（未产出文件） */
-  via?: 'picker' | 'download' | 'cancel';
+  /**
+   * web 端导出方式：picker=系统保存对话框、share=系统分享面板（iOS）、
+   * download=浏览器下载、cancel=用户取消（未产出文件）
+   */
+  via?: 'picker' | 'share' | 'download' | 'cancel';
 }
 
 /** File System Access API 的最小类型面，避免依赖 lib.dom 版本 */
@@ -166,6 +169,38 @@ function downloadViaDataUrl(json: string, fileName: string): void {
   a.remove();
 }
 
+/** iOS / iPadOS Safari（含「请求桌面网站」模式的 iPad，UA 伪装成 Mac） */
+function isAppleTouchOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+type ShareCapableNavigator = Navigator & {
+  canShare?: (data: { files: File[] }) => boolean;
+  share?: (data: { files: File[] }) => Promise<void>;
+};
+
+/**
+ * 通过系统分享面板导出（Web Share API Level 2）。
+ * iOS Safari 的 download 属性不可靠（下载常被静默丢弃），分享面板的「储存到文件」是标准出口。
+ */
+async function shareBackupFile(json: string, fileName: string): Promise<'shared' | 'cancel' | 'unsupported'> {
+  const nav = navigator as ShareCapableNavigator;
+  if (typeof nav.canShare !== 'function' || typeof nav.share !== 'function') return 'unsupported';
+  const file = new File([json], fileName, { type: 'application/json' });
+  if (!nav.canShare({ files: [file] })) return 'unsupported';
+  try {
+    await nav.share({ files: [file] });
+    return 'shared';
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return 'cancel';
+    return 'unsupported';
+  }
+}
+
 /**
  * 导出全部业务数据：
  * web 直接触发浏览器下载；原生写入沙盒 backups/ 并尽量拉起系统分享。
@@ -180,6 +215,12 @@ export async function exportAll(db: SQLite.SQLiteDatabase): Promise<ExportResult
     const picked = await saveWithFilePicker(json, fileName);
     if (picked === 'saved') return { rowCount, fileName, filePath: '', via: 'picker' };
     if (picked === 'cancel') return { rowCount: 0, fileName, filePath: '', via: 'cancel' };
+    // iOS / iPadOS Safari：download 属性不可靠，优先系统分享面板（可「储存到文件」）
+    if (isAppleTouchOS()) {
+      const shared = await shareBackupFile(json, fileName);
+      if (shared === 'shared') return { rowCount, fileName, filePath: '', via: 'share' };
+      if (shared === 'cancel') return { rowCount: 0, fileName, filePath: '', via: 'cancel' };
+    }
     downloadViaDataUrl(json, fileName);
     return { rowCount, fileName, filePath: '', via: 'download' };
   }
