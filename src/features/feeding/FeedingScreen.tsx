@@ -51,6 +51,7 @@ export function FeedingScreen({ navigation }: MainTabScreenProps<'Feeding'>) {
   const [records, setRecords] = useState<FeedingRecord[]>([]);
   const [totalMl, setTotalMl] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<FeedingRecord | null>(null);
   const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
@@ -93,7 +94,7 @@ export function FeedingScreen({ navigation }: MainTabScreenProps<'Feeding'>) {
       bottomInset
       title="喂养记录"
       subtitle="时间 · 方式 · 奶量 · 时长，一目了然"
-      fab={<Fab label="记一次" onPress={() => setFormOpen(true)} />}
+      fab={<Fab label="记一次" onPress={() => { setEditingRecord(null); setFormOpen(true); }} />}
     >
       <View style={styles.statsRow}>
         <StatCard
@@ -171,6 +172,7 @@ export function FeedingScreen({ navigation }: MainTabScreenProps<'Feeding'>) {
 
       <FeedingFormSheet
         visible={formOpen}
+        editing={editingRecord}
         babyId={activeBaby.id}
         unit={volumeUnit}
         onClose={() => setFormOpen(false)}
@@ -209,66 +211,57 @@ interface FormState {
   note: string;
 }
 
-function FeedingFormSheet({
+/** 新增 / 编辑喂养记录的弹层表单：传入 editing 时为编辑模式（预填并走更新） */
+export function FeedingFormSheet({
   visible,
+  editing,
   babyId,
   unit,
   onClose,
   onSaved,
 }: {
   visible: boolean;
+  editing?: FeedingRecord | null;
   babyId: string;
   unit: VolumeUnit;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { feeding } = useServices();
-  const [form, setForm] = useState<FormState>({
-    startedAt: nowISO(),
-    method: FeedingMethod.Formula,
-    volumeInput: '',
-    durationInput: '',
-    nursingSide: NURSING_SIDES[0]!,
-    note: '',
-  });
+  const [form, setForm] = useState<FormState>(blankForm());
 
   useEffect(() => {
-    if (visible) {
-      setForm({
-        startedAt: nowISO(),
-        method: FeedingMethod.Formula,
-        volumeInput: '',
-        durationInput: '',
-        nursingSide: NURSING_SIDES[0]!,
-        note: '',
-      });
-    }
-  }, [visible]);
+    if (visible) setForm(editing ? prefillForm(editing, unit) : blankForm());
+  }, [visible, editing, unit]);
 
   const save = async () => {
     const volume = parseFloat(form.volumeInput);
     const durationMin = parseFloat(form.durationInput);
-    await feeding.add({
-      babyId,
+    const fields = {
       startedAt: form.startedAt,
       method: form.method,
       volumeMl: Number.isFinite(volume) && volume > 0 ? toMl(volume, unit) : null,
       durationSeconds: Number.isFinite(durationMin) && durationMin > 0 ? Math.round(durationMin * 60) : null,
       nursingSide: form.method === FeedingMethod.Breast ? form.nursingSide : null,
       note: form.note,
-    });
+    };
+    if (editing) {
+      await feeding.update({ ...editing, ...fields });
+    } else {
+      await feeding.add({ babyId, ...fields });
+    }
     onSaved();
   };
 
   return (
     <ModalSheet
       visible={visible}
-      title="记一次喂养"
+      title={editing ? '编辑喂养记录' : '记一次喂养'}
       onClose={onClose}
       footer={
         <>
           <Button title="取消" variant="ghost" block onPress={onClose} />
-          <Button title="保存" block onPress={() => void save()} />
+          <Button title={editing ? '保存修改' : '保存'} block onPress={() => void save()} />
         </>
       }
     >
@@ -322,6 +315,34 @@ function FeedingFormSheet({
       />
     </ModalSheet>
   );
+}
+
+function blankForm(): FormState {
+  return {
+    startedAt: nowISO(),
+    method: FeedingMethod.Formula,
+    volumeInput: '',
+    durationInput: '',
+    nursingSide: NURSING_SIDES[0]!,
+    note: '',
+  };
+}
+
+/** 编辑模式：把已存记录换算回表单字符串（奶量按当前单位展示） */
+function prefillForm(r: FeedingRecord, unit: VolumeUnit): FormState {
+  return {
+    startedAt: r.startedAt,
+    method: r.method,
+    volumeInput:
+      r.volumeMl != null
+        ? unit === VolumeUnit.OZ
+          ? String(fromMl(r.volumeMl, VolumeUnit.OZ).toFixed(1))
+          : String(Math.round(r.volumeMl))
+        : '',
+    durationInput: r.durationSeconds != null ? String(Math.round(r.durationSeconds / 60)) : '',
+    nursingSide: r.nursingSide ?? NURSING_SIDES[0]!,
+    note: r.note ?? '',
+  };
 }
 
 const styles = StyleSheet.create({

@@ -189,13 +189,16 @@ interface EventFormState {
   photoUris: string[];
 }
 
-function EventFormSheet({
+/** 新增 / 编辑异常事件的弹层表单：传入 editing 时为编辑模式（预填并走更新，照片仅追加） */
+export function EventFormSheet({
   visible,
+  editing,
   babyId,
   onClose,
   onSaved,
 }: {
   visible: boolean;
+  editing?: AbnormalEvent | null;
   babyId: string;
   onClose: () => void;
   onSaved: () => void;
@@ -212,16 +215,27 @@ function EventFormSheet({
 
   useEffect(() => {
     if (visible) {
-      setForm({
-        occurredAt: nowISO(),
-        category: EventCategory.Fever,
-        severity: SEVERITY_LEVELS[0]!,
-        temperatureInput: '',
-        description: '',
-        photoUris: [],
-      });
+      setForm(
+        editing
+          ? {
+              occurredAt: editing.occurredAt,
+              category: editing.category,
+              severity: editing.severity,
+              temperatureInput: editing.temperatureC != null ? String(editing.temperatureC) : '',
+              description: editing.description ?? '',
+              photoUris: [],
+            }
+          : {
+              occurredAt: nowISO(),
+              category: EventCategory.Fever,
+              severity: SEVERITY_LEVELS[0]!,
+              temperatureInput: '',
+              description: '',
+              photoUris: [],
+            },
+      );
     }
-  }, [visible]);
+  }, [visible, editing]);
 
   const addPhoto = async () => {
     const uri = await pickPhotoFromLibrary();
@@ -230,15 +244,19 @@ function EventFormSheet({
 
   const save = async () => {
     const temperature = parseFloat(form.temperatureInput);
-    const added = await event.add({
-      babyId,
+    const fields = {
       occurredAt: form.occurredAt,
       category: form.category,
       severity: form.severity,
       temperatureC: Number.isFinite(temperature) ? temperature : null,
       description: form.description,
-      newPhotoUris: form.photoUris,
-    });
+    };
+
+    if (editing) {
+      await event.update({ ...editing, ...fields }, form.photoUris);
+    } else {
+      await event.add({ babyId, ...fields, newPhotoUris: form.photoUris });
+    }
 
     // 过敏预警：描述文本命中该宝宝已登记的过敏原时提示
     const warnings = await allergen.checkTextForWarnings(babyId, form.description ?? '');
@@ -247,8 +265,8 @@ function EventFormSheet({
         '⚠️ 过敏原预警',
         warnings.map((w) => w.message).join('\n'),
       );
-    } else if (added) {
-      Alert.alert('已保存', '异常事件已记录，密切观察宝宝状态。');
+    } else {
+      Alert.alert('已保存', editing ? '修改已保存，密切观察宝宝状态。' : '异常事件已记录，密切观察宝宝状态。');
     }
     onSaved();
   };
@@ -256,12 +274,12 @@ function EventFormSheet({
   return (
     <ModalSheet
       visible={visible}
-      title="记录异常事件"
+      title={editing ? '编辑异常事件' : '记录异常事件'}
       onClose={onClose}
       footer={
         <>
           <Button title="取消" variant="ghost" block onPress={onClose} />
-          <Button title="保存" block onPress={() => void save()} />
+          <Button title={editing ? '保存修改' : '保存'} block onPress={() => void save()} />
         </>
       }
     >
@@ -304,7 +322,11 @@ function EventFormSheet({
       />
 
       <View style={styles.fieldBlock}>
-        <AppText variant="caption" style={styles.fieldLabel}>照片附件（{form.photoUris.length}）</AppText>
+        <AppText variant="caption" style={styles.fieldLabel}>
+          {editing
+            ? `追加照片（已有 ${editing.attachments.length} 张，不可删改）`
+            : `照片附件（${form.photoUris.length}）`}
+        </AppText>
         <View style={styles.chipRow}>
           <Chip label="＋ 从相册选择" onPress={() => void addPhoto()} />
           {form.photoUris.map((uri, i) => (

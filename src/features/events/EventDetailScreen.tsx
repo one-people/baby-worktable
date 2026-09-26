@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, View } from 'react-native';
 
 import { resolvePhotoUri } from '@/core/files/photoStore';
@@ -21,6 +21,8 @@ import {
 } from '@/ui';
 import type { RootStackScreenProps } from '@/navigation/types';
 
+import { EventFormSheet } from './EventsScreen';
+
 type Props = RootStackScreenProps<'EventDetail'>;
 
 /** 症状类别对应的色调与图标（与列表页一致） */
@@ -33,13 +35,14 @@ const CATEGORY_META: Record<EventCategory, { tone: keyof typeof tones; icon: 'he
   [EventCategory.Other]: { tone: 'mint', icon: 'alert' },
 };
 
-/** 异常事件详情：症状摘要 + 全字段 + 过敏原预警 + 照片 + 删除 */
+/** 异常事件详情：症状摘要 + 全字段 + 过敏原预警 + 照片 + 编辑 / 删除 */
 export function EventDetailScreen({ navigation, route }: Props) {
   const { event, allergen } = useServices();
   const [record, setRecord] = useState<AbnormalEvent | null | undefined>(undefined);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [formOpen, setFormOpen] = useState(false);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     let alive = true;
     event.get(route.params.id).then(async (e) => {
       if (!alive) return;
@@ -53,6 +56,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
       alive = false;
     };
   }, [event, allergen, route.params.id]);
+
+  useEffect(() => reload(), [reload]);
 
   const remove = () =>
     Alert.alert('删除事件', '删除后将同时移除其照片附件，确定删除？', [
@@ -133,7 +138,27 @@ export function EventDetailScreen({ navigation, route }: Props) {
         </>
       )}
 
+      <Button
+        title="编辑这条事件"
+        variant="secondary"
+        block
+        onPress={() => setFormOpen(true)}
+        style={styles.editBtn}
+      />
       <Button title="删除这条事件" variant="danger" block onPress={remove} style={styles.deleteBtn} />
+
+      {record != null && (
+        <EventFormSheet
+          visible={formOpen}
+          editing={record}
+          babyId={record.babyId}
+          onClose={() => setFormOpen(false)}
+          onSaved={() => {
+            setFormOpen(false);
+            reload();
+          }}
+        />
+      )}
     </Screen>
   );
 }
@@ -162,5 +187,6 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.chipOff,
   },
-  deleteBtn: { marginTop: theme.spacing.xl },
+  editBtn: { marginTop: theme.spacing.xl },
+  deleteBtn: { marginTop: theme.spacing.md },
 });

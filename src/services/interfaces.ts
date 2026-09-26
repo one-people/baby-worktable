@@ -53,7 +53,8 @@ export interface IAbnormalEventService {
   /** 按 id 读取单条事件（含照片附件，详情页用），不存在返回 null */
   get(id: string): Promise<AbnormalEvent | null>;
   add(draft: AbnormalEventDraft): Promise<AbnormalEvent>;
-  update(event: AbnormalEvent): Promise<void>;
+  /** 更新事件字段；newPhotoUris 为编辑时追加的照片（原附件保持不变） */
+  update(event: AbnormalEvent, newPhotoUris?: string[]): Promise<void>;
   remove(id: string): Promise<void>;
   listForBaby(babyId: string, query?: TimeRangeQuery): Promise<AbnormalEvent[]>;
 }

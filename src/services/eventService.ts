@@ -51,8 +51,19 @@ export function createEventService(
       return event;
     },
 
-    async update(event: AbnormalEvent): Promise<void> {
+    async update(event: AbnormalEvent, newPhotoUris: string[] = []): Promise<void> {
       await repo.update(touch(event));
+      const now = nowISO();
+      for (const uri of newPhotoUris) {
+        const filePath = await savePhoto(uri);
+        await attachments.insert({
+          id: newId(),
+          eventId: event.id,
+          filePath,
+          mimeType: guessMime(uri),
+          createdAt: now,
+        });
+      }
     },
 
     async remove(id: string): Promise<void> {

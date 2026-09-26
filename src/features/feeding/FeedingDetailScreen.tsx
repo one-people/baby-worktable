@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { formatDate, formatTime, relativeTime } from '@/core/utils/datetime';
@@ -22,17 +22,24 @@ import {
 } from '@/ui';
 import type { RootStackScreenProps } from '@/navigation/types';
 
+import { FeedingFormSheet } from './FeedingScreen';
+
 type Props = RootStackScreenProps<'FeedingDetail'>;
 
-/** 喂养记录详情：大数值摘要 + 全字段展示 + 删除 */
+/** 喂养记录详情：大数值摘要 + 全字段展示 + 编辑 / 删除 */
 export function FeedingDetailScreen({ navigation, route }: Props) {
   const { feeding } = useServices();
   const { volumeUnit } = useApp();
   const [record, setRecord] = useState<FeedingRecord | null | undefined>(undefined);
+  const [formOpen, setFormOpen] = useState(false);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     feeding.get(route.params.id).then(setRecord);
   }, [feeding, route.params.id]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   const remove = () =>
     Alert.alert('删除记录', '确定删除这条喂养记录吗？', [
@@ -104,7 +111,28 @@ export function FeedingDetailScreen({ navigation, route }: Props) {
         <DetailRow label="记录于" value={`${formatDate(record.createdAt)} ${formatTime(record.createdAt)}`} />
       </Card>
 
+      <Button
+        title="编辑这条记录"
+        variant="secondary"
+        block
+        onPress={() => setFormOpen(true)}
+        style={styles.editBtn}
+      />
       <Button title="删除这条记录" variant="danger" block onPress={remove} style={styles.deleteBtn} />
+
+      {record != null && (
+        <FeedingFormSheet
+          visible={formOpen}
+          editing={record}
+          babyId={record.babyId}
+          unit={volumeUnit}
+          onClose={() => setFormOpen(false)}
+          onSaved={() => {
+            setFormOpen(false);
+            reload();
+          }}
+        />
+      )}
     </Screen>
   );
 }
@@ -122,5 +150,6 @@ const styles = StyleSheet.create({
   heroValueRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   heroUnit: { fontSize: 15, fontWeight: '700', color: theme.colors.textSubdued, paddingBottom: 5 },
   fields: { gap: theme.spacing.lg },
-  deleteBtn: { marginTop: theme.spacing.xl },
+  editBtn: { marginTop: theme.spacing.xl },
+  deleteBtn: { marginTop: theme.spacing.md },
 });

@@ -32,6 +32,7 @@ export function GrowthScreen() {
   const [records, setRecords] = useState<GrowthRecord[]>([]);
   const [metric, setMetric] = useState<GrowthMetric>(GrowthMetric.Weight);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<GrowthRecord | null>(null);
 
   const load = useCallback(async () => {
     if (!activeBaby) return;
@@ -71,7 +72,7 @@ export function GrowthScreen() {
       bottomInset
       title="生长发育"
       subtitle="身高 · 体重 · 头围，追踪宝宝每一厘米"
-      fab={<Fab label="记一次测量" onPress={() => setFormOpen(true)} />}
+      fab={<Fab label="记一次测量" onPress={() => { setEditingRecord(null); setFormOpen(true); }} />}
     >
       <View style={styles.metricSwitch}>
         <SegmentedControl
@@ -113,7 +114,7 @@ export function GrowthScreen() {
         </AppText>
       )}
 
-      <SectionTitle title="测量记录" icon="calendar" trailing={<AppText variant="caption">长按可删除</AppText>} />
+      <SectionTitle title="测量记录" icon="calendar" trailing={<AppText variant="caption">点击编辑 · 长按删除</AppText>} />
       {records.length === 0 && <AppText variant="caption">暂无记录。</AppText>}
       {[...records].reverse().map((r) => (
         <ListRow
@@ -121,6 +122,7 @@ export function GrowthScreen() {
           icon="ruler"
           title={formatDate(r.measuredAt)}
           subtitle={describeRecord(r)}
+          onPress={() => { setEditingRecord(r); setFormOpen(true); }}
           onLongPress={() =>
             Alert.alert('删除记录', '确定删除这条测量记录吗？', [
               { text: '取消', style: 'cancel' },
@@ -135,6 +137,7 @@ export function GrowthScreen() {
 
       <GrowthFormSheet
         visible={formOpen}
+        editing={editingRecord}
         babyId={activeBaby.id}
         onClose={() => setFormOpen(false)}
         onSaved={() => {
@@ -167,13 +170,16 @@ function describeRecord(r: GrowthRecord): string {
 
 /* ----------------------------- 测量表单 ----------------------------- */
 
+/** 新增 / 编辑测量记录的弹层表单：传入 editing 时为编辑模式（预填并走更新） */
 function GrowthFormSheet({
   visible,
+  editing,
   babyId,
   onClose,
   onSaved,
 }: {
   visible: boolean;
+  editing?: GrowthRecord | null;
   babyId: string;
   onClose: () => void;
   onSaved: () => void;
@@ -187,13 +193,13 @@ function GrowthFormSheet({
 
   useEffect(() => {
     if (visible) {
-      setMeasuredAt(nowISO());
-      setHeightInput('');
-      setWeightInput('');
-      setHeadInput('');
-      setNote('');
+      setMeasuredAt(editing ? editing.measuredAt : nowISO());
+      setHeightInput(editing?.heightCm != null ? String(editing.heightCm) : '');
+      setWeightInput(editing?.weightG != null ? String(gramsToKg(editing.weightG)) : '');
+      setHeadInput(editing?.headCircumferenceCm != null ? String(editing.headCircumferenceCm) : '');
+      setNote(editing?.note ?? '');
     }
-  }, [visible]);
+  }, [visible, editing]);
 
   const save = async () => {
     const height = parseFloat(heightInput);
@@ -205,26 +211,30 @@ function GrowthFormSheet({
       Alert.alert('提示', '至少填写一项测量值。');
       return;
     }
-    await growth.add({
-      babyId,
+    const fields = {
       measuredAt,
       heightCm: Number.isFinite(height) && height > 0 ? height : null,
       weightG: Number.isFinite(weightKg) && weightKg > 0 ? kgToGrams(weightKg) : null,
       headCircumferenceCm: Number.isFinite(head) && head > 0 ? head : null,
       note,
-    });
+    };
+    if (editing) {
+      await growth.update({ ...editing, ...fields });
+    } else {
+      await growth.add({ babyId, ...fields });
+    }
     onSaved();
   };
 
   return (
     <ModalSheet
       visible={visible}
-      title="记录测量"
+      title={editing ? '编辑测量记录' : '记录测量'}
       onClose={onClose}
       footer={
         <>
           <Button title="取消" variant="ghost" block onPress={onClose} />
-          <Button title="保存" block onPress={() => void save()} />
+          <Button title={editing ? '保存修改' : '保存'} block onPress={() => void save()} />
         </>
       }
     >
