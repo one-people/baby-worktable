@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { formatDate, formatTime, nowISO } from '@/core/utils/datetime';
 import type { Memo, MemoCategoryNode } from '@/models/Memo';
@@ -360,6 +360,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 9,
     fontSize: 15,
+    // 同 TextField：iOS Safari 聚焦自动放大问题，web 端强制 16px
+    ...Platform.select({ web: { fontSize: 16 } }),
     color: theme.colors.text,
   },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },

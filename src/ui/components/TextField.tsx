@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Platform,
   StyleSheet,
   TextInput,
   type StyleProp,
@@ -57,6 +58,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 11,
     fontSize: 15,
+    // iOS Safari 聚焦 <16px 输入框会自动放大页面且键盘收起后不回落，web 端强制 16
+    ...Platform.select({ web: { fontSize: 16 } }),
     color: theme.colors.text,
   },
   inputFocused: { borderColor: theme.colors.primary },

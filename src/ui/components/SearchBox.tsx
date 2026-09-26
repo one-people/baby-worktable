@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { theme } from '@/ui/theme';
 import { AppIcon } from '../icons';
@@ -44,5 +44,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 12,
   },
-  input: { flex: 1, paddingVertical: 9, fontSize: 15, color: theme.colors.text },
+  input: {
+    flex: 1,
+    paddingVertical: 9,
+    fontSize: 15,
+    // 同 TextField：iOS Safari 聚焦自动放大问题，web 端强制 16px
+    ...Platform.select({ web: { fontSize: 16 } }),
+    color: theme.colors.text,
+  },
 });
