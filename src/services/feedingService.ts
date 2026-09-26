@@ -62,6 +62,7 @@ export function createFeedingService(repo: FeedingRepository): IFeedingService {
         [FeedingMethod.Breast]: 0,
         [FeedingMethod.Formula]: 0,
         [FeedingMethod.Mixed]: 0,
+        [FeedingMethod.Solid]: 0,
       };
       let totalMl = 0;
       for (const r of records) {

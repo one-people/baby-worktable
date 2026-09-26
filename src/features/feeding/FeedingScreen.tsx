@@ -40,6 +40,7 @@ const METHOD_TONE: Record<FeedingMethod, Tone> = {
   [FeedingMethod.Breast]: 'pink',
   [FeedingMethod.Formula]: 'sky',
   [FeedingMethod.Mixed]: 'mint',
+  [FeedingMethod.Solid]: 'lemon',
 };
 
 /** 喂养记录：当日统计 + 时间轴（按日分组）+ 名称检索 + 新增弹层 */
@@ -290,13 +291,18 @@ function FeedingFormSheet({
           </View>
         </View>
       )}
-      {form.method !== FeedingMethod.Breast && (
+      {(form.method === FeedingMethod.Formula || form.method === FeedingMethod.Mixed) && (
         <TextField
           label={`奶量 (${unit === VolumeUnit.OZ ? '盎司 oz' : '毫升 ml'})`}
           keyboardType="decimal-pad"
           value={form.volumeInput}
           onChangeText={(v) => setForm({ ...form, volumeInput: v })}
         />
+      )}
+      {form.method === FeedingMethod.Solid && (
+        <AppText variant="caption" style={styles.solidHint}>
+          辅食不记奶量：吃了什么、吃了多少写进备注即可（如「米粉 + 南瓜泥，大半碗」）。
+        </AppText>
       )}
       <TextField
         label="持续时长（分钟，选填）"
@@ -308,7 +314,11 @@ function FeedingFormSheet({
         label="备注（选填）"
         value={form.note}
         onChangeText={(v) => setForm({ ...form, note: v })}
-        placeholder="例如：吃得很急 / 打嗝了"
+        placeholder={
+          form.method === FeedingMethod.Solid
+            ? '例如：米粉 / 南瓜泥，吃了大半碗'
+            : '例如：吃得很急 / 打嗝了'
+        }
       />
     </ModalSheet>
   );
@@ -332,4 +342,5 @@ const styles = StyleSheet.create({
   fieldBlock: { gap: 6 },
   fieldLabel: { fontWeight: '500', color: theme.colors.text },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  solidHint: { color: theme.colors.textSubdued },
 });

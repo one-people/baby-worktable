@@ -35,6 +35,7 @@ export enum FeedingMethod {
   Breast = 'breast', // 母乳
   Formula = 'formula', // 配方奶
   Mixed = 'mixed', // 混合
+  Solid = 'solid', // 辅食
 }
 
 /** 亲喂侧别（仅母乳亲喂时有意义） */
@@ -114,6 +115,7 @@ export const FEEDING_METHODS: readonly FeedingMethod[] = [
   FeedingMethod.Breast,
   FeedingMethod.Formula,
   FeedingMethod.Mixed,
+  FeedingMethod.Solid,
 ];
 
 export const NURSING_SIDES: readonly NursingSide[] = [
@@ -137,6 +139,7 @@ export const LABELS: Record<string, string> = {
   [FeedingMethod.Breast]: '母乳',
   [FeedingMethod.Formula]: '配方奶',
   [FeedingMethod.Mixed]: '混合',
+  [FeedingMethod.Solid]: '辅食',
   [NursingSide.Left]: '左侧',
   [NursingSide.Right]: '右侧',
   [NursingSide.Both]: '双侧',
