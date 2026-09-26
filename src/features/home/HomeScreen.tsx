@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { formatTime, formatAgeYMD, relativeTime } from '@/core/utils/datetime';
@@ -16,11 +16,9 @@ import {
   Button,
   Card,
   EmptyState,
-  ListRow,
   PressableScale,
   Screen,
   SectionTitle,
-  Tag,
   theme,
   tones,
 } from '@/ui';
@@ -28,7 +26,7 @@ import type { MainTabScreenProps } from '@/navigation/types';
 
 type Props = MainTabScreenProps<'Home'>;
 
-/** 距上次喂养超过该分钟数时，首页间隔条转为提醒态 */
+/** 距上次喂养超过该分钟数时，间隔条转为提醒态 */
 const HUNGRY_AFTER_MIN = 180;
 
 /** 最近记录流的条目：喂养与异常事件按时间混排 */
@@ -56,7 +54,7 @@ function formatInterval(minutes: number): string {
 
 /**
  * 首页：纯看板（导航交给底部 Tab）。
- * 宝宝信息 Hero 卡 + 今日喂养焦点卡 + 成长速览 + 最近记录流。
+ * 视觉层级：珊瑚底「今日奶量」强调卡（第一眼）→ 白卡数字 → 区块标题 → 列表行。
  */
 export function HomeScreen({ navigation }: Props) {
   const { feeding, event, growth } = useServices();
@@ -102,11 +100,12 @@ export function HomeScreen({ navigation }: Props) {
   }
 
   const isOz = volumeUnit === VolumeUnit.OZ;
+  const hasToday = stats != null && stats.totalCount > 0;
   const milkValue = stats
     ? isOz
       ? fromMl(stats.totalMl, VolumeUnit.OZ).toFixed(1)
       : `${Math.round(stats.totalMl)}`
-    : '—';
+    : '0';
   const milkUnit = isOz ? 'oz' : 'ml';
   const fmtVol = (ml?: number | null) =>
     ml == null ? null : isOz ? `${fromMl(ml, VolumeUnit.OZ).toFixed(1)} oz` : `${Math.round(ml)} ml`;
@@ -130,19 +129,26 @@ export function HomeScreen({ navigation }: Props) {
     .sort((a, b) => timeOf(b).localeCompare(timeOf(a)))
     .slice(0, 3);
 
+  const growthCells = [
+    { key: 'weight', label: '体重', value: growthSummary?.latestWeightG != null ? `${(growthSummary.latestWeightG / 1000).toFixed(1)}` : '—', unit: 'kg', dot: tones.mint.deep },
+    { key: 'height', label: '身高', value: growthSummary?.latestHeightCm != null ? growthSummary.latestHeightCm.toFixed(1) : '—', unit: 'cm', dot: tones.sky.deep },
+    { key: 'head', label: '头围', value: growthSummary?.latestHeadCircumferenceCm != null ? growthSummary.latestHeadCircumferenceCm.toFixed(1) : '—', unit: 'cm', dot: tones.lemon.deep },
+  ];
+
   return (
     <Screen bottomInset>
-      {/* Hero：宝宝信息卡 */}
-      <View style={styles.hero}>
+      {/* 档案条：紧凑的宝宝信息 */}
+      <View style={styles.profileBar}>
         <View style={styles.avatar}>
           <AppText style={styles.avatarEmoji}>👶</AppText>
         </View>
-        <View style={styles.heroTexts}>
-          <AppText variant="caption" style={styles.heroGreeting}>{greetingByHour()}</AppText>
-          <AppText variant="title" numberOfLines={1}>
+        <View style={styles.profileTexts}>
+          <AppText variant="heading" numberOfLines={1}>
             {activeBaby.name} · {formatAgeYMD(activeBaby.birthDate)}
           </AppText>
-          <AppText variant="caption">出生 {activeBaby.birthDate}</AppText>
+          <AppText variant="caption" numberOfLines={1}>
+            {greetingByHour()} · 出生 {activeBaby.birthDate}
+          </AppText>
         </View>
         <Button
           title="档案"
@@ -152,113 +158,124 @@ export function HomeScreen({ navigation }: Props) {
         />
       </View>
 
-      {/* 今日喂养焦点卡：点击进喂养页 */}
-      <PressableScale onPress={() => navigation.navigate('Feeding')} style={styles.focusCard}>
-        <View style={styles.cardHeader}>
-          <View style={[styles.iconBubble, { backgroundColor: tones.pink.soft }]}>
-            <AppIcon name="bottle" size={18} color={tones.pink.deep} strokeWidth={2.2} />
-          </View>
-          <AppText variant="heading" style={styles.cardTitle}>今日奶量</AppText>
-          <AppIcon name="chevronRight" size={18} color={theme.colors.textSubdued} strokeWidth={2.2} />
+      {/* 今日奶量：首页唯一的强调卡，点击进喂养页 */}
+      <PressableScale stretch onPress={() => navigation.navigate('Feeding')} style={styles.todayCard}>
+        <View style={styles.decoA} />
+        <View style={styles.decoB} />
+        <View style={styles.todayTop}>
+          <AppText style={styles.todayLabel}>今日奶量</AppText>
+          {hasToday && (
+            <View style={styles.whitePill}>
+              <AppText style={styles.whitePillText}>共 {stats!.totalCount} 次</AppText>
+            </View>
+          )}
         </View>
 
-        {stats != null && stats.totalCount > 0 ? (
+        {hasToday ? (
           <>
-            <View style={styles.valueRow}>
-              <AppText variant="stat">{milkValue}</AppText>
-              <AppText style={styles.valueUnit}>{milkUnit}</AppText>
-              <AppText variant="caption" style={styles.valueCount}>共 {stats.totalCount} 次</AppText>
+            <View style={styles.todayValueRow}>
+              <AppText style={styles.todayValue}>{milkValue}</AppText>
+              <AppText style={styles.todayUnit}>{milkUnit}</AppText>
             </View>
             {methodChips.length > 0 && (
-              <View style={styles.chipRow}>
+              <View style={styles.methodRow}>
                 {methodChips.map((c) => (
-                  <View key={c.key} style={styles.methodChip}>
-                    <AppText variant="caption" style={styles.methodChipText}>{c.label}</AppText>
+                  <View key={c.key} style={styles.ghostPill}>
+                    <AppText style={styles.ghostPillText}>{c.label}</AppText>
                   </View>
                 ))}
               </View>
             )}
+            {minutesSince != null && (
+              <View style={[styles.intervalBar, hungry && styles.intervalBarHot]}>
+                <AppText style={[styles.intervalText, hungry && styles.intervalTextHot]}>
+                  {`距上次喂养 ${formatInterval(minutesSince)}`}
+                  {stats?.lastStartedAt ? ` · 上次 ${formatTime(stats.lastStartedAt)}` : ''}
+                  {hungry ? ' · 宝宝可能饿啦 🍼' : ''}
+                </AppText>
+              </View>
+            )}
           </>
         ) : (
-          <AppText variant="caption" style={styles.emptyHint}>今天还没有记录，去喂养页记第一笔吧 🍼</AppText>
-        )}
-
-        {minutesSince != null && (
-          <View style={[styles.intervalBanner, hungry && styles.intervalOverdue]}>
-            <AppText
-              variant="caption"
-              style={[styles.intervalText, hungry && styles.intervalTextHot]}
-            >
-              {`距上次喂养 ${formatInterval(minutesSince)}`}
-              {stats?.lastStartedAt ? ` · 上次 ${formatTime(stats.lastStartedAt)}` : ''}
-              {hungry ? ' · 宝宝可能饿啦' : ''}
-            </AppText>
+          <View style={styles.todayEmpty}>
+            <AppText style={styles.todayEmptyText}>今天还没有喂养记录</AppText>
+            <View style={styles.actionPill}>
+              <AppText style={styles.actionPillText}>去记一笔 🍼</AppText>
+            </View>
           </View>
         )}
       </PressableScale>
 
-      {/* 成长速览卡：点击进成长页 */}
-      <PressableScale onPress={() => navigation.navigate('Growth')} style={styles.focusCard}>
-        <View style={styles.cardHeader}>
-          <View style={[styles.iconBubble, { backgroundColor: tones.mint.soft }]}>
-            <AppIcon name="trendingUp" size={18} color={tones.mint.deep} strokeWidth={2.2} />
-          </View>
-          <AppText variant="heading" style={styles.cardTitle}>成长速览</AppText>
-          <AppIcon name="chevronRight" size={18} color={theme.colors.textSubdued} strokeWidth={2.2} />
+      {/* 成长速览：白卡三列，点击进成长页 */}
+      <PressableScale stretch onPress={() => navigation.navigate('Growth')} style={styles.panelCard}>
+        <View style={styles.panelHeader}>
+          <AppText variant="heading" style={styles.panelTitle}>成长速览</AppText>
+          <AppText style={styles.panelLink}>成长曲线 ›</AppText>
         </View>
         <View style={styles.growthRow}>
-          {([
-            { label: '体重', value: growthSummary?.latestWeightG != null ? `${(growthSummary.latestWeightG / 1000).toFixed(1)}` : '—', unit: 'kg', tone: 'mint' as const },
-            { label: '身高', value: growthSummary?.latestHeightCm != null ? growthSummary.latestHeightCm.toFixed(1) : '—', unit: 'cm', tone: 'sky' as const },
-            { label: '头围', value: growthSummary?.latestHeadCircumferenceCm != null ? growthSummary.latestHeadCircumferenceCm.toFixed(1) : '—', unit: 'cm', tone: 'lemon' as const },
-          ]).map((m) => (
-            <View key={m.label} style={styles.growthCell}>
-              <AppText variant="caption">{m.label}</AppText>
-              <View style={styles.growthValueRow}>
-                <AppText variant="heading" style={{ color: tones[m.tone].deep }}>{m.value}</AppText>
-                {m.value !== '—' && <AppText variant="caption"> {m.unit}</AppText>}
+          {growthCells.map((m, i) => (
+            <React.Fragment key={m.key}>
+              {i > 0 && <View style={styles.colDivider} />}
+              <View style={styles.growthCell}>
+                <View style={styles.growthLabelRow}>
+                  <View style={[styles.toneDot, { backgroundColor: m.dot }]} />
+                  <AppText variant="caption">{m.label}</AppText>
+                </View>
+                <View style={styles.growthValueRow}>
+                  <AppText style={styles.growthValue}>{m.value}</AppText>
+                  {m.value !== '—' && <AppText style={styles.growthUnit}>{m.unit}</AppText>}
+                </View>
               </View>
-            </View>
+            </React.Fragment>
           ))}
         </View>
-        <AppText variant="caption" style={styles.growthHint}>
+        <View style={styles.panelDivider} />
+        <AppText variant="caption" style={styles.panelHint}>
           {growthSummary?.daysSinceLastMeasure != null
-            ? `${growthSummary.daysSinceLastMeasure} 天前测量 · 点击查看趋势`
+            ? `距上次测量 ${growthSummary.daysSinceLastMeasure} 天 · 点击查看趋势`
             : '尚未测量 · 点击去记录'}
         </AppText>
       </PressableScale>
 
+      {/* 最近记录：单卡列表，行间分隔线 */}
       <SectionTitle title="最近记录" icon="clock" />
       {feedItems.length > 0 ? (
-        <View>
-          {feedItems.map((item) =>
-            item.kind === 'feeding' ? (
-              <ListRow
-                key={`f-${item.record.id}`}
-                icon="bottle"
-                tone="pink"
-                title={`${labelOf(item.record.method)}${fmtVol(item.record.volumeMl) ? ` ${fmtVol(item.record.volumeMl)}` : ''}`}
-                subtitle={`${relativeTime(item.record.startedAt)}${item.record.note ? ` · ${item.record.note}` : ''}`}
-                onPress={() => navigation.navigate('Feeding')}
-                trailing={<AppIcon name="chevronRight" size={16} color={theme.colors.textSubdued} strokeWidth={2.2} />}
-              />
-            ) : (
-              <ListRow
-                key={`e-${item.record.id}`}
-                icon={item.record.category === 'fever' ? '🌡️' : '🩹'}
-                title={`${labelOf(item.record.category)}${item.record.temperatureC != null ? ` ${item.record.temperatureC}℃` : ''}`}
-                subtitle={relativeTime(item.record.occurredAt)}
-                onPress={() => navigation.navigate('Events')}
-                trailing={
-                  <Tag
-                    text={
-                      item.record.severity === 'severe' ? '重度' : item.record.severity === 'moderate' ? '中度' : '轻度'
-                    }
-                  />
-                }
-              />
-            ),
-          )}
+        <View style={styles.feedCard}>
+          {feedItems.map((item, idx) => {
+            const isFeeding = item.kind === 'feeding';
+            const vol = isFeeding ? fmtVol(item.record.volumeMl) : null;
+            const title = isFeeding
+              ? `${labelOf(item.record.method)}${vol ? ` ${vol}` : ''}`
+              : `${labelOf(item.record.category)}${item.record.temperatureC != null ? ` ${item.record.temperatureC}℃` : ''}`;
+            const subtitle = isFeeding
+              ? (item.record.note ?? '喂养记录')
+              : (item.record.description ?? '异常事件记录');
+            const emoji = !isFeeding && item.record.category === 'fever' ? '🌡️' : '🩹';
+            return (
+              <React.Fragment key={isFeeding ? `f-${item.record.id}` : `e-${item.record.id}`}>
+                {idx > 0 && <View style={styles.feedDivider} />}
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => navigation.navigate(isFeeding ? 'Feeding' : 'Events')}
+                  style={({ pressed }) => [styles.feedRow, pressed && styles.feedRowPressed]}
+                >
+                <View style={[styles.feedChip, { backgroundColor: (isFeeding ? tones.pink : tones.lemon).soft }]}>
+                  {isFeeding ? (
+                    <AppIcon name="bottle" size={19} color={tones.pink.deep} strokeWidth={2.2} />
+                  ) : (
+                    <AppText style={styles.feedEmoji}>{emoji}</AppText>
+                  )}
+                </View>
+                <View style={styles.feedTexts}>
+                  <AppText numberOfLines={1} style={styles.feedTitle}>{title}</AppText>
+                  <AppText variant="caption" numberOfLines={1}>{subtitle}</AppText>
+                </View>
+                <AppText variant="caption" style={styles.feedTime}>{relativeTime(timeOf(item))}</AppText>
+                <AppIcon name="chevronRight" size={15} color={theme.colors.textSubdued} strokeWidth={2.2} />
+                </Pressable>
+              </React.Fragment>
+            );
+          })}
         </View>
       ) : (
         <Card>
@@ -269,77 +286,149 @@ export function HomeScreen({ navigation }: Props) {
   );
 }
 
+const WHITE = '#FFFFFF';
+
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  /* Hero 信息卡 */
-  hero: {
+  /* 档案条 */
+  profileBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.lg - 4,
+    gap: theme.spacing.md,
     backgroundColor: tones.coral.soft,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.md + 2,
-    ...theme.shadows.float,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
   },
   avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: theme.radius.lg,
+    width: 46,
+    height: 46,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarEmoji: { fontSize: 27 },
-  heroTexts: { flex: 1, gap: 2 },
-  heroGreeting: { color: theme.colors.primaryDeep, fontWeight: '600' },
+  avatarEmoji: { fontSize: 23 },
+  profileTexts: { flex: 1, gap: 2 },
 
-  /* 焦点卡通用 */
-  focusCard: {
-    backgroundColor: theme.colors.card,
+  /* 今日奶量强调卡（珊瑚底白字） */
+  todayCard: {
+    backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     gap: theme.spacing.sm + 2,
-    ...theme.shadows.card,
+    overflow: 'hidden',
+    ...theme.shadows.float,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  iconBubble: {
-    width: 32,
-    height: 32,
-    borderRadius: theme.radius.sm + 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+  decoA: {
+    position: 'absolute',
+    top: -46,
+    right: -30,
+    width: 150,
+    height: 150,
+    borderRadius: theme.radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.10)',
   },
-  cardTitle: { flex: 1, fontSize: 16 },
-
-  /* 今日喂养 */
-  valueRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, paddingBottom: 2 },
-  valueUnit: { fontWeight: '700', fontSize: 14, lineHeight: 20, color: theme.colors.textSubdued, paddingBottom: 3 },
-  valueCount: { paddingBottom: 5, marginLeft: theme.spacing.sm },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  methodChip: {
-    backgroundColor: theme.colors.chipOff,
+  decoB: {
+    position: 'absolute',
+    bottom: -58,
+    right: 64,
+    width: 110,
+    height: 110,
+    borderRadius: theme.radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  todayTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  todayLabel: { color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  whitePill: {
+    backgroundColor: 'rgba(255,255,255,0.24)',
     borderRadius: theme.radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
-  methodChipText: { color: theme.colors.text, fontWeight: '500' },
-  emptyHint: { color: theme.colors.textSubdued },
-  intervalBanner: {
-    backgroundColor: theme.colors.chipOff,
+  whitePillText: { color: WHITE, fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  todayValueRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  todayValue: { color: WHITE, fontSize: 34, fontWeight: '800', lineHeight: 40 },
+  todayUnit: { color: WHITE, fontSize: 14, fontWeight: '700', lineHeight: 20, paddingBottom: 5 },
+  methodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  ghostPill: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  ghostPillText: { color: WHITE, fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  intervalBar: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing.md,
+    paddingVertical: 7,
+  },
+  intervalBarHot: { backgroundColor: 'rgba(255,255,255,0.96)' },
+  intervalText: { color: WHITE, fontSize: 12.5, fontWeight: '600', lineHeight: 18 },
+  intervalTextHot: { color: theme.colors.primaryDeep },
+  todayEmpty: { gap: theme.spacing.md, paddingBottom: 2 },
+  todayEmptyText: { color: 'rgba(255,255,255,0.92)', fontSize: 14, lineHeight: 20 },
+  actionPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: WHITE,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  intervalOverdue: { backgroundColor: theme.colors.warningSoft },
-  intervalText: { color: theme.colors.textSubdued, fontWeight: '500' },
-  intervalTextHot: { color: theme.colors.warning, fontWeight: '600' },
+  actionPillText: { color: theme.colors.primaryDeep, fontSize: 14, fontWeight: '700', lineHeight: 20 },
 
-  /* 成长速览 */
-  growthRow: { flexDirection: 'row' },
-  growthCell: { flex: 1, gap: 2 },
-  growthValueRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  growthHint: { color: theme.colors.textSubdued },
+  /* 白卡面板（成长速览） */
+  panelCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.md,
+    ...theme.shadows.card,
+  },
+  panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  panelTitle: { fontSize: 16 },
+  panelLink: { color: theme.colors.primaryDeep, fontSize: 12.5, fontWeight: '600', lineHeight: 18 },
+  growthRow: { flexDirection: 'row', alignItems: 'stretch' },
+  growthCell: { flex: 1, gap: 4 },
+  growthLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  toneDot: { width: 7, height: 7, borderRadius: theme.radius.pill },
+  growthValueRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  growthValue: { color: theme.colors.text, fontSize: 21, fontWeight: '800', lineHeight: 27 },
+  growthUnit: { color: theme.colors.textSubdued, fontSize: 12, fontWeight: '600', lineHeight: 17, paddingBottom: 3 },
+  colDivider: { width: 1, backgroundColor: theme.colors.rail, marginHorizontal: theme.spacing.md },
+  panelDivider: { height: 1, backgroundColor: theme.colors.rail },
+  panelHint: { color: theme.colors.textSubdued },
+
+  /* 最近记录列表卡 */
+  feedCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    paddingVertical: 4,
+    overflow: 'hidden',
+    ...theme.shadows.card,
+  },
+  feedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingVertical: 13,
+    paddingHorizontal: theme.spacing.md,
+  },
+  feedDivider: { height: 1, backgroundColor: theme.colors.rail, marginHorizontal: theme.spacing.md },
+  feedRowPressed: { opacity: 0.75 },
+  feedChip: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md - 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedEmoji: { fontSize: 19 },
+  feedTexts: { flex: 1, gap: 2 },
+  feedTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  feedTime: { color: theme.colors.textSubdued },
 });

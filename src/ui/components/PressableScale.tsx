@@ -16,6 +16,8 @@ interface PressableScaleProps extends PressableProps {
   scaleTo?: number;
   /** 外观与布局样式（背景、圆角、阴影、尺寸都放这里） */
   style?: StyleProp<ViewStyle>;
+  /** 内容撑满容器（整行大卡片用）；默认居中收缩（按钮/瓦片用） */
+  stretch?: boolean;
 }
 
 // Pressable 自身承载样式与缩放动画：点击热区覆盖整个元素（含内边距），
@@ -30,6 +32,7 @@ export function PressableScale({
   children,
   scaleTo = 0.95,
   style,
+  stretch,
   disabled,
   onPressIn,
   onPressOut,
@@ -61,7 +64,7 @@ export function PressableScale({
       disabled={disabled}
       onPressIn={handleIn}
       onPressOut={handleOut}
-      style={[styles.self, style, { transform: [{ scale }] }, disabled && { opacity: 0.5 }]}
+      style={[styles.self, stretch && styles.stretch, style, { transform: [{ scale }] }, disabled && { opacity: 0.5 }]}
     >
       {children}
     </AnimatedPressable>
@@ -70,4 +73,5 @@ export function PressableScale({
 
 const styles = StyleSheet.create({
   self: { alignItems: 'center', justifyContent: 'center' },
+  stretch: { alignItems: 'stretch', justifyContent: 'flex-start' },
 });

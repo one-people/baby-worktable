@@ -63,6 +63,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: theme.radius.xl,
     maxHeight: '86%',
     paddingBottom: Platform.OS === 'ios' ? 28 : 20,
+    // 桌面宽屏下弹层与内容列同宽，避免横向拉满全屏
+    ...(Platform.OS === 'web'
+      ? ({ maxWidth: 520, width: '100%', alignSelf: 'center' } as const)
+      : null),
     ...theme.shadows.float,
   },
   grip: {
